@@ -1,0 +1,6 @@
+mode: set
+diff-cover/test/main.go:5.20,6.11 1 1
+diff-cover/test/main.go:7.9,8.19 1 1
+diff-cover/test/main.go:9.9,10.19 1 1
+diff-cover/test/main.go:11.9,12.19 1 1
+diff-cover/test/main.go:13.9,14.19 1 1
