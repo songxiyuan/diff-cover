@@ -26,21 +26,24 @@ func TestDiffCoverMerge(t *testing.T) {
 			args: args{
 				cc1: CommitCover{
 					Repository:    repository,
+					Branch:        "init",
 					CommitId:      commitId1,
 					CoverFilePath: "./test/cover_1_4.out",
 				},
 				cc2: CommitCover{
 					Repository:    repository,
+					Branch:        "init",
 					CommitId:      commitId2,
 					CoverFilePath: "./test/cover_2_3.out",
 				},
+				tempDir: "tmp/",
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := DiffCoverMerge(tt.args.cc1, tt.args.cc2, tt.args.tempDir); (err != nil) != tt.wantErr {
+			if _, err := DiffCoverMerge(tt.args.cc1, tt.args.cc2, tt.args.tempDir); (err != nil) != tt.wantErr {
 				t.Errorf("DiffCoverMerge() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -13,6 +13,7 @@ import (
 
 type CommitCover struct {
 	Repository    string
+	Branch        string
 	CommitId      string
 	CoverFilePath string
 }
@@ -21,83 +22,89 @@ var (
 	ErrRepositoryNotSame = errors.New("repository not same")
 )
 
-func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (err error) {
+func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Profile, err error) {
 	if cc1.Repository != cc2.Repository {
-		return ErrRepositoryNotSame
+		err = ErrRepositoryNotSame
+		return
 	}
+	//todo 相同commit id合并问题
 	if cc1.CommitId == cc2.CommitId {
+		err = errors.New("commit id equal")
 		return
 	}
 
 	path, err := util.GetGitPath(cc1.Repository)
 	if err != nil {
+		util.Logger.Println(err)
 		return
 	}
 
 	r, err := git.PlainOpen(tempDir + path)
 	if err != nil {
-		fmt.Println(err)
+		util.Logger.Println(err)
 		r, err = git.PlainClone(tempDir+path, false, &git.CloneOptions{
 			URL: cc1.Repository,
 		})
 		if err != nil {
-			fmt.Println(err)
+			util.Logger.Println(err)
 			return
 		}
 	}
 
+	list, err := r.Remotes()
+	fmt.Println(list)
+
 	//待确定fetch的使用
 	err = r.Fetch(&git.FetchOptions{
-		RemoteName: "origin",
+		RemoteName: "origin init", //暂时只支持一个branch
 	})
-	if err != nil {
-		fmt.Println(err)
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		util.Logger.Println(err)
 		return
 	}
 
-	sto := r.Storer
+	tree1, err := r.TreeObject(plumbing.NewHash(cc1.CommitId))
+	if err != nil {
+		util.Logger.Println(err)
+		return
+	}
+	tree2, err := r.TreeObject(plumbing.NewHash(cc2.CommitId))
+	if err != nil {
+		util.Logger.Println(err)
+		return
+	}
 
-	var tree1 *object.Tree
-	c1, err := object.GetCommit(sto, plumbing.NewHash(cc1.CommitId))
+	profiles1, err := cover.ParseProfiles(cc1.CoverFilePath)
 	if err != nil {
+		util.Logger.Println(err)
 		return
 	}
-	tree1, err = c1.Tree()
+	profiles2, err := cover.ParseProfiles(cc2.CoverFilePath)
 	if err != nil {
+		util.Logger.Println(err)
 		return
 	}
+	err = ProfileMerge(profiles1, profiles2, tree1, tree2)
+	if err != nil {
+		util.Logger.Println(err)
+		return
+	}
+	err = DumpProfile("res.out", profiles2)
+	if err != nil {
+		util.Logger.Println(err)
+	}
+	return profiles2, nil
+}
 
-	var tree2 *object.Tree
-	c2, err := object.GetCommit(sto, plumbing.NewHash(cc2.CommitId))
-	if err != nil {
-		return
-	}
-	tree2, err = c2.Tree()
-	if err != nil {
-		return
-	}
+func ProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tree) (err error) {
 	changes, err := object.DiffTree(tree1, tree2)
-	fmt.Println(changes)
-
 	var changeFileMap = make(map[string]struct{})
-
 	for _, change := range changes {
 		if change.From.Name != "" {
 			changeFileMap[change.From.Name] = struct{}{}
 		}
 	}
-
-	profiles1, err := cover.ParseProfiles(cc1.CoverFilePath)
-	if err != nil {
-		return
-	}
-	profiles2, err := cover.ParseProfiles(cc2.CoverFilePath)
-	if err != nil {
-		return
-	}
-
 	for _, profile := range profiles1 {
-		//去掉模块名字的前缀
 		fileName := strings.Join(strings.Split(profile.FileName, "/")[1:], "/")
 		_, ok := changeFileMap[fileName]
 		if !ok {
@@ -110,7 +117,7 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (err error) {
 					return errors.New("len(p.Blocks)!=1")
 				}
 				for b := 0; b < len(profile.Blocks); b++ {
-					//todo 检查顺序是否一直
+					//todo 检查顺序是否一致
 					if profiles2[i].Blocks[b].StartLine != profile.Blocks[b].StartLine {
 						return errors.New("顺序不一致")
 					}
@@ -121,26 +128,17 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (err error) {
 			continue
 		}
 		//在差异文件中，diff两个commit文件，拿到旧覆盖行数对应新覆盖的新行数，然后遍历添加到coverage2
-		file1, err := tree1.File(fileName)
+		file1Str, err := getFileString(tree1, fileName)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
-		file2, err := tree2.File(fileName)
+		file2Str, err := getFileString(tree2, fileName)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
-		file1Str, err := file1.Contents()
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		file2Str, err := file2.Contents()
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
+
 		line2line := GetLineMap(file1Str, file2Str)
 		//生成 map[新覆盖文件开始行]新文件该行对应的block
 		startLineBlockMap := make(map[int]cover.ProfileBlock)
@@ -182,12 +180,17 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (err error) {
 			break
 		}
 	}
-	err = DumpProfile("res.cov", profiles2)
+	return
+}
+func getFileString(tree *object.Tree, fileName string) (string, error) {
+	file, err := tree.File(fileName)
 	if err != nil {
-		fmt.Println("错误", err)
-		return
+		fmt.Println(err)
+		return "", err
 	}
-
-	return nil
-
+	res, err := file.Contents()
+	if err != nil {
+		return "", err
+	}
+	return res, nil
 }
