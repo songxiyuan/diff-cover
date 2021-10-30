@@ -41,6 +41,7 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Prof
 
 	r, err := git.PlainOpen(tempDir + path)
 	if err != nil {
+
 		util.Logger.Println(err)
 		r, err = git.PlainClone(tempDir+path, false, &git.CloneOptions{
 			URL: cc1.Repository,
@@ -51,24 +52,20 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Prof
 		}
 	}
 
-	list, err := r.Remotes()
-	fmt.Println(list)
-
-	//待确定fetch的使用
-	err = r.Fetch(&git.FetchOptions{
-		RemoteName: "origin init", //暂时只支持一个branch
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		util.Logger.Println(err)
+	c1, err := object.GetCommit(r.Storer, plumbing.NewHash(cc1.CommitId))
+	if err != nil {
 		return
 	}
-
-	tree1, err := r.TreeObject(plumbing.NewHash(cc1.CommitId))
+	tree1, err := c1.Tree()
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
-	tree2, err := r.TreeObject(plumbing.NewHash(cc2.CommitId))
+	c2, err := object.GetCommit(r.Storer, plumbing.NewHash(cc2.CommitId))
+	if err != nil {
+		return
+	}
+	tree2, err := c2.Tree()
 	if err != nil {
 		util.Logger.Println(err)
 		return
@@ -152,9 +149,7 @@ func ProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tr
 			}
 			newEnd, ok := line2line[block.EndLine]
 			if !ok {
-				//报错
-				fmt.Println("DiffCoverMerge 和 覆盖率文件对应错误")
-				return errors.New("")
+				return errors.New("DiffCoverMerge 和 覆盖率文件对应错误")
 			}
 			block.StartLine = newStart
 			block.EndLine = newEnd
@@ -171,9 +166,7 @@ func ProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tr
 					continue
 				}
 				if block.EndLine != profiles2[i].Blocks[j].EndLine {
-					//报错
-					fmt.Println("DiffCoverMerge 和 覆盖率文件对应错误")
-					return errors.New("")
+					return errors.New("DiffCoverMerge 和 覆盖率文件对应错误")
 				}
 				profiles2[i].Blocks[j].Count += block.Count
 			}
