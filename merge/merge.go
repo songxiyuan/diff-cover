@@ -86,10 +86,6 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Prof
 		util.Logger.Println(err)
 		return
 	}
-	err = DumpProfile("res.out", profiles2)
-	if err != nil {
-		util.Logger.Println(err)
-	}
 	return profiles2, nil
 }
 
