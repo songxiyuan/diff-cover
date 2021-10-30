@@ -1,4 +1,4 @@
-module diff-cover
+module github.com/songxiyuan/diff-cover
 
 go 1.15
 
