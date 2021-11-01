@@ -106,9 +106,6 @@ func ProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tr
 				if profiles2[i].FileName != profile.FileName {
 					continue
 				}
-				if len(profiles2[i].Blocks) != 1 {
-					return errors.New("len(p.Blocks)!=1")
-				}
 				for b := 0; b < len(profile.Blocks); b++ {
 					//todo 检查顺序是否一致
 					if profiles2[i].Blocks[b].StartLine != profile.Blocks[b].StartLine {
