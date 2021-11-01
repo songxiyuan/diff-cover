@@ -22,7 +22,7 @@ var (
 	ErrRepositoryNotSame = errors.New("repository not same")
 )
 
-func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Profile, err error) {
+func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profile, err error) {
 	if cc1.Repository != cc2.Repository {
 		err = ErrRepositoryNotSame
 		return
@@ -33,17 +33,17 @@ func DiffCoverMerge(cc1, cc2 CommitCover, tempDir string) (profile []*cover.Prof
 		return
 	}
 
-	path, err := util.GetGitPath(cc1.Repository)
-	if err != nil {
-		util.Logger.Println(err)
-		return
-	}
+	//path, err := util.GetGitPath(cc1.Repository)
+	//if err != nil {
+	//	util.Logger.Println(err)
+	//	return
+	//}
 
-	r, err := git.PlainOpen(tempDir + path)
+	r, err := git.PlainOpen(gitDir)
 	if err != nil {
 
 		util.Logger.Println(err)
-		r, err = git.PlainClone(tempDir+path, false, &git.CloneOptions{
+		r, err = git.PlainClone(gitDir, false, &git.CloneOptions{
 			URL: cc1.Repository,
 		})
 		if err != nil {
