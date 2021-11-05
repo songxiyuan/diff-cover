@@ -34,7 +34,7 @@ func SameCommitCoverMerge(filePath1, filePath2 string) error {
 	if err != nil {
 		return err
 	}
-	p12, err := SameCommitProfileMerge(p1, p2)
+	p12, err := SameCommitProfileMerge(p2, p1)
 	if err != nil {
 		return err
 	}
@@ -45,19 +45,19 @@ func SameCommitCoverMerge(filePath1, filePath2 string) error {
 	return nil
 }
 
-// SameCommitProfileMerge 相同commit的测试覆盖报告的合并
-func SameCommitProfileMerge(a []*cover.Profile, b []*cover.Profile) (profile []*cover.Profile, err error) {
+// SameCommitProfileMerge 相同commit的测试覆盖报告的合并,注意只会将未覆盖到的行数合并到新的
+func SameCommitProfileMerge(newP []*cover.Profile, oldP []*cover.Profile) (res []*cover.Profile, err error) {
 	var result []*cover.Profile
-	files := make(map[string]*cover.Profile, len(a))
-	for _, profile := range a {
+	files := make(map[string]*cover.Profile, len(newP))
+	for _, profile := range newP {
 		np := deepCopyProfile(*profile)
 		result = append(result, &np)
 		files[np.FileName] = &np
 	}
 
 	needsSort := false
-	// Now merge b into the result
-	for _, profile := range b {
+	// Now merge oldP into the result
+	for _, profile := range oldP {
 		dest, ok := files[profile.FileName]
 		if ok {
 			if err := ensureProfilesMatch(profile, dest); err != nil {
@@ -65,11 +65,11 @@ func SameCommitProfileMerge(a []*cover.Profile, b []*cover.Profile) (profile []*
 			}
 			for i, block := range profile.Blocks {
 				db := &dest.Blocks[i]
-				db.Count += block.Count
+				if db.Count == 0 { //只会将未覆盖到的行数合并到新的
+					db.Count += block.Count
+				}
 			}
 		} else {
-			// If we get some file we haven't seen before, we just append it.
-			// We need to sort this later to ensure the resulting profile is still correctly sorted.
 			np := deepCopyProfile(*profile)
 			files[np.FileName] = &np
 			result = append(result, &np)
