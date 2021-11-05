@@ -8,6 +8,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/songxiyuan/diff-cover/util"
 	"golang.org/x/tools/cover"
+	"sort"
 	"strings"
 )
 
@@ -22,6 +23,66 @@ var (
 	ErrRepositoryNotSame = errors.New("repository not same")
 )
 
+// SameCommitCoverMerge 相同commit的测试覆盖报告的合并,覆盖到第二个文件中
+func SameCommitCoverMerge(filePath1, filePath2 string) error {
+	//合并
+	p1, err := cover.ParseProfiles(filePath1)
+	if err != nil {
+		return err
+	}
+	p2, err := cover.ParseProfiles(filePath2)
+	if err != nil {
+		return err
+	}
+	p12, err := SameCommitProfileMerge(p1, p2)
+	if err != nil {
+		return err
+	}
+	err = DumpProfile(filePath2, p12)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// SameCommitProfileMerge 相同commit的测试覆盖报告的合并
+func SameCommitProfileMerge(a []*cover.Profile, b []*cover.Profile) (profile []*cover.Profile, err error) {
+	var result []*cover.Profile
+	files := make(map[string]*cover.Profile, len(a))
+	for _, profile := range a {
+		np := deepCopyProfile(*profile)
+		result = append(result, &np)
+		files[np.FileName] = &np
+	}
+
+	needsSort := false
+	// Now merge b into the result
+	for _, profile := range b {
+		dest, ok := files[profile.FileName]
+		if ok {
+			if err := ensureProfilesMatch(profile, dest); err != nil {
+				return nil, fmt.Errorf("error merging %s: %w", profile.FileName, err)
+			}
+			for i, block := range profile.Blocks {
+				db := &dest.Blocks[i]
+				db.Count += block.Count
+			}
+		} else {
+			// If we get some file we haven't seen before, we just append it.
+			// We need to sort this later to ensure the resulting profile is still correctly sorted.
+			np := deepCopyProfile(*profile)
+			files[np.FileName] = &np
+			result = append(result, &np)
+			needsSort = true
+		}
+	}
+	if needsSort {
+		sort.Slice(result, func(i, j int) bool { return result[i].FileName < result[j].FileName })
+	}
+	return result, nil
+}
+
+// DiffCoverMerge 不同commit的测试覆盖报告合并
 func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profile, err error) {
 	if cc1.Repository != cc2.Repository {
 		err = ErrRepositoryNotSame
@@ -81,7 +142,7 @@ func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profi
 		util.Logger.Println(err)
 		return
 	}
-	err = ProfileMerge(profiles1, profiles2, tree1, tree2)
+	err = DiffProfileMerge(profiles1, profiles2, tree1, tree2)
 	if err != nil {
 		util.Logger.Println(err)
 		return
@@ -89,7 +150,7 @@ func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profi
 	return profiles2, nil
 }
 
-func ProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tree) (err error) {
+func DiffProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tree) (err error) {
 	changes, err := object.DiffTree(tree1, tree2)
 	var changeFileMap = make(map[string]struct{})
 	for _, change := range changes {
