@@ -7,6 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // DumpProfile dumps the profile to the given file destination.
@@ -101,4 +104,28 @@ func ensureProfilesMatch(a *cover.Profile, b *cover.Profile) error {
 		}
 	}
 	return nil
+}
+
+func GetModuleFromTree(tree *object.Tree) (module string) {
+	goModFile, err := tree.File("go.mod")
+	if err != nil {
+		return
+	}
+	content, err := goModFile.Contents()
+	if err != nil {
+		return
+	}
+	return GetModule(content)
+}
+
+func GetModule(content string) (module string) {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			line = strings.TrimPrefix(line, "module ")
+			return strings.TrimSpace(line) + "/"
+		}
+	}
+	return
 }

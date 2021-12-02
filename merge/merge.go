@@ -83,18 +83,18 @@ func SameCommitProfileMerge(newP []*cover.Profile, oldP []*cover.Profile) (res [
 }
 
 // DiffCoverMerge 不同commit的测试覆盖报告合并
-func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profile, err error) {
-	if cc1.Repository != cc2.Repository {
+func DiffCoverMerge(ccFrom, ccTo CommitCover, gitDir string) (profile []*cover.Profile, err error) {
+	if ccFrom.Repository != ccTo.Repository {
 		err = ErrRepositoryNotSame
 		return
 	}
 	//todo 相同commit id合并问题
-	if cc1.CommitId == cc2.CommitId {
+	if ccFrom.CommitId == ccTo.CommitId {
 		err = errors.New("commit id equal")
 		return
 	}
 
-	//path, err := util.GetGitPath(cc1.Repository)
+	//path, err := util.GetGitPath(ccFrom.Repository)
 	//if err != nil {
 	//	util.Logger.Println(err)
 	//	return
@@ -102,10 +102,9 @@ func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profi
 
 	r, err := git.PlainOpen(gitDir)
 	if err != nil {
-
 		util.Logger.Println(err)
 		r, err = git.PlainClone(gitDir, false, &git.CloneOptions{
-			URL: cc1.Repository,
+			URL: ccFrom.Repository,
 		})
 		if err != nil {
 			util.Logger.Println(err)
@@ -113,78 +112,82 @@ func DiffCoverMerge(cc1, cc2 CommitCover, gitDir string) (profile []*cover.Profi
 		}
 	}
 
-	c1, err := object.GetCommit(r.Storer, plumbing.NewHash(cc1.CommitId))
+	commitFrom, err := object.GetCommit(r.Storer, plumbing.NewHash(ccFrom.CommitId))
 	if err != nil {
 		return
 	}
-	tree1, err := c1.Tree()
+	treeFrom, err := commitFrom.Tree()
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
-	c2, err := object.GetCommit(r.Storer, plumbing.NewHash(cc2.CommitId))
+	//get module name
+	moduleNameFrom := GetModuleFromTree(treeFrom)
+	util.Logger.Println("module=", moduleNameFrom)
+
+	commitTo, err := object.GetCommit(r.Storer, plumbing.NewHash(ccTo.CommitId))
 	if err != nil {
 		return
 	}
-	tree2, err := c2.Tree()
+	treeTo, err := commitTo.Tree()
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
 
-	profiles1, err := cover.ParseProfiles(cc1.CoverFilePath)
+	profilesFrom, err := cover.ParseProfiles(ccFrom.CoverFilePath)
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
-	profiles2, err := cover.ParseProfiles(cc2.CoverFilePath)
+	profilesTo, err := cover.ParseProfiles(ccTo.CoverFilePath)
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
-	err = DiffProfileMerge(profiles1, profiles2, tree1, tree2)
+	err = DiffProfileMerge(moduleNameFrom, profilesFrom, profilesTo, treeFrom, treeTo)
 	if err != nil {
 		util.Logger.Println(err)
 		return
 	}
-	return profiles2, nil
+	return profilesTo, nil
 }
 
-func DiffProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *object.Tree) (err error) {
-	changes, err := object.DiffTree(tree1, tree2)
+func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.Profile, treeFrom, treeTo *object.Tree) (err error) {
+	changes, err := object.DiffTree(treeFrom, treeTo)
 	var changeFileMap = make(map[string]struct{})
 	for _, change := range changes {
 		if change.From.Name != "" {
 			changeFileMap[change.From.Name] = struct{}{}
 		}
 	}
-	for _, profile := range profiles1 {
-		fileName := strings.Join(strings.Split(profile.FileName, "/")[1:], "/")
+	for _, profile := range profilesFrom {
+		fileName := strings.TrimPrefix(profile.FileName, moduleNameFrom)
 		_, ok := changeFileMap[fileName]
 		if !ok {
 			//不在差异文件里，将所有覆盖情况转移到新的覆盖情况中
-			for i := 0; i < len(profiles2); i++ {
-				if profiles2[i].FileName != profile.FileName {
+			for i := 0; i < len(profilesTo); i++ {
+				if profilesTo[i].FileName != profile.FileName {
 					continue
 				}
 				for b := 0; b < len(profile.Blocks); b++ {
-					//todo 检查顺序是否一致
-					if profiles2[i].Blocks[b].StartLine != profile.Blocks[b].StartLine {
-						return errors.New("顺序不一致")
+					//todo check order
+					if profilesTo[i].Blocks[b].StartLine != profile.Blocks[b].StartLine {
+						return errors.New("start line not equal")
 					}
-					profiles2[i].Blocks[b].Count += profile.Blocks[b].Count
+					profilesTo[i].Blocks[b].Count += profile.Blocks[b].Count
 				}
 				break
 			}
 			continue
 		}
 		//在差异文件中，diff两个commit文件，拿到旧覆盖行数对应新覆盖的新行数，然后遍历添加到coverage2
-		file1Str, err := getFileString(tree1, fileName)
+		file1Str, err := getFileString(treeFrom, fileName)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
-		file2Str, err := getFileString(tree2, fileName)
+		file2Str, err := getFileString(treeTo, fileName)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -210,19 +213,19 @@ func DiffProfileMerge(profiles1, profiles2 []*cover.Profile, tree1, tree2 *objec
 			startLineBlockMap[newStart] = block
 		}
 		//遍历新覆盖文件,替换新的block
-		for i := 0; i < len(profiles2); i++ {
-			if profiles2[i].FileName != profile.FileName {
+		for i := 0; i < len(profilesTo); i++ {
+			if profilesTo[i].FileName != profile.FileName {
 				continue
 			}
-			for j := 0; j < len(profiles2[i].Blocks); j++ {
-				block, ok := startLineBlockMap[profiles2[i].Blocks[j].StartLine]
+			for j := 0; j < len(profilesTo[i].Blocks); j++ {
+				block, ok := startLineBlockMap[profilesTo[i].Blocks[j].StartLine]
 				if !ok {
 					continue
 				}
-				if block.EndLine != profiles2[i].Blocks[j].EndLine {
+				if block.EndLine != profilesTo[i].Blocks[j].EndLine {
 					return errors.New("DiffCoverMerge 和 覆盖率文件对应错误")
 				}
-				profiles2[i].Blocks[j].Count += block.Count
+				profilesTo[i].Blocks[j].Count += block.Count
 			}
 			break
 		}

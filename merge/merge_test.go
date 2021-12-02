@@ -40,6 +40,25 @@ func TestDiffCoverMerge(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "for test",
+			args: args{
+				cc1: CommitCover{
+					Repository:    "git@git.xiaojukeji.com:guarana/dive-app-g.git",
+					Branch:        "feature_oe_fix_gmv",
+					CommitId:      "f5c19a69866413a23b5676ec94ecd61f5505e50c",
+					CoverFilePath: "./test/dive-app-g/merged_f5c19a69866413a23b5676ec94ecd61f5505e50c.out",
+				},
+				cc2: CommitCover{
+					Repository:    "git@git.xiaojukeji.com:guarana/dive-app-g.git",
+					Branch:        "feature_oe_fix_gmv",
+					CommitId:      "6f68cc88bb190291c584e84986cbeeb9da05c888",
+					CoverFilePath: "./test/dive-app-g/6f68cc88bb190291c584e84986cbeeb9da05c888.out",
+				},
+				tempDir: "tmp/",
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
