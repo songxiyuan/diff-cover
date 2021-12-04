@@ -19,6 +19,12 @@ type CommitCover struct {
 	CoverFilePath string
 }
 
+// CoverPos record the position of cover file
+type CoverPos struct {
+	Line int
+	Col  int
+}
+
 var (
 	ErrRepositoryNotSame = errors.New("repository not same")
 )
@@ -194,8 +200,8 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 		}
 
 		line2line := GetLineMap(file1Str, file2Str)
-		//生成 map[新覆盖文件开始行]新文件该行对应的block
-		startLineBlockMap := make(map[int]cover.ProfileBlock)
+		//generate map of "ToCoverFile record line" to "ToCoverFile clock"
+		startLineBlockMap := make(map[CoverPos]cover.ProfileBlock)
 		for _, block := range profile.Blocks {
 			if block.Count == 0 {
 				continue
@@ -206,24 +212,28 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 			}
 			newEnd, ok := line2line[block.EndLine]
 			if !ok {
-				return errors.New("DiffCoverMerge 和 覆盖率文件对应错误")
+				return errors.New("get new end error")
 			}
 			block.StartLine = newStart
 			block.EndLine = newEnd
-			startLineBlockMap[newStart] = block
+			startLineBlockMap[CoverPos{newStart, block.StartCol}] = block
 		}
-		//遍历新覆盖文件,替换新的block
+		// range new file, replace block
 		for i := 0; i < len(profilesTo); i++ {
 			if profilesTo[i].FileName != profile.FileName {
 				continue
 			}
 			for j := 0; j < len(profilesTo[i].Blocks); j++ {
-				block, ok := startLineBlockMap[profilesTo[i].Blocks[j].StartLine]
+				coverPos := CoverPos{
+					Line: profilesTo[i].Blocks[j].StartLine,
+					Col:  profilesTo[i].Blocks[j].StartCol,
+				}
+				block, ok := startLineBlockMap[coverPos]
 				if !ok {
 					continue
 				}
 				if block.EndLine != profilesTo[i].Blocks[j].EndLine {
-					return errors.New("DiffCoverMerge 和 覆盖率文件对应错误")
+					return errors.New("get end line error")
 				}
 				profilesTo[i].Blocks[j].Count += block.Count
 			}
