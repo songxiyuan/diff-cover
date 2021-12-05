@@ -233,7 +233,8 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 					continue
 				}
 				if block.EndLine != profilesTo[i].Blocks[j].EndLine {
-					return errors.New("get end line error")
+					continue
+					//return errors.New("get end line error")
 				}
 				profilesTo[i].Blocks[j].Count += block.Count
 			}
