@@ -1,11 +1,7 @@
 package merge
 
 import (
-	"bytes"
 	"github.com/sergi/go-diff/diffmatchpatch"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/transform"
-	"io/ioutil"
 	"time"
 )
 
@@ -41,8 +37,7 @@ func GetLine2Line(diffs []diffmatchpatch.Diff) map[int]int {
 */
 
 func GetLineMap(str1, str2 string) map[int]int {
-	str1, _ = toUtf8Encoding(str1)
-	str2, _ = toUtf8Encoding(str2)
+	//注意 diff工具不要升级到1.2.0,diff会出现问题
 	dmp := diffmatchpatch.New()
 	dmp.DiffTimeout = 10 * time.Second
 	wSrc, wDst, wArray := dmp.DiffLinesToRunes(str1, str2)
@@ -53,14 +48,4 @@ func GetLineMap(str1, str2 string) map[int]int {
 	//todo 文本合并操作
 	diffs = dmp.DiffCharsToLines(diffs, wArray)
 	return line2line
-}
-
-func toUtf8Encoding(str string) (res string, err error) {
-	encode, _, _ := charset.DetermineEncoding([]byte(str), "")
-	reader := transform.NewReader(bytes.NewReader([]byte(str)), encode.NewDecoder())
-	resByte, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return str, err
-	}
-	return string(resByte), err
 }
