@@ -212,7 +212,7 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 			}
 			newEnd, ok := line2line[block.EndLine]
 			if !ok {
-				return errors.New("get new end error")
+				continue
 			}
 			block.StartLine = newStart
 			block.EndLine = newEnd
