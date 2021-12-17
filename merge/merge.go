@@ -161,6 +161,10 @@ func DiffCoverMerge(ccFrom, ccTo CommitCover, gitDir string) (profile []*cover.P
 
 func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.Profile, treeFrom, treeTo *object.Tree) (err error) {
 	changes, err := object.DiffTree(treeFrom, treeTo)
+	if err != nil {
+		util.Logger.Println(err)
+		return
+	}
 	var changeFileMap = make(map[string]struct{})
 	for _, change := range changes {
 		if change.From.Name != "" {
