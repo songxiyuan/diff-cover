@@ -194,12 +194,12 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 		//在差异文件中，diff两个commit文件，拿到旧覆盖行数对应新覆盖的新行数，然后遍历添加到coverage2
 		file1Str, err := getFileString(treeFrom, fileName)
 		if err != nil {
-			fmt.Println(err)
+			util.Logger.Println(err)
 			return err
 		}
 		file2Str, err := getFileString(treeTo, fileName)
 		if err != nil {
-			fmt.Println(err)
+			util.Logger.Println(err)
 			return err
 		}
 
@@ -250,7 +250,7 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 func getFileString(tree *object.Tree, fileName string) (string, error) {
 	file, err := tree.File(fileName)
 	if err != nil {
-		fmt.Println(err)
+		util.Logger.Println(err)
 		return "", err
 	}
 	res, err := file.Contents()
