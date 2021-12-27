@@ -92,11 +92,13 @@ func SameCommitProfileMerge(newP []*cover.Profile, oldP []*cover.Profile) (res [
 func DiffCoverMerge(ccFrom, ccTo CommitCover, gitDir string) (profile []*cover.Profile, err error) {
 	if ccFrom.Repository != ccTo.Repository {
 		err = ErrRepositoryNotSame
+		util.Logger.Println(err)
 		return
 	}
 	//todo 相同commit id合并问题
 	if ccFrom.CommitId == ccTo.CommitId {
 		err = errors.New("commit id equal")
+		util.Logger.Println(err)
 		return
 	}
 
@@ -120,6 +122,7 @@ func DiffCoverMerge(ccFrom, ccTo CommitCover, gitDir string) (profile []*cover.P
 
 	commitFrom, err := object.GetCommit(r.Storer, plumbing.NewHash(ccFrom.CommitId))
 	if err != nil {
+		util.Logger.Println(err)
 		return
 	}
 	treeFrom, err := commitFrom.Tree()
@@ -133,6 +136,7 @@ func DiffCoverMerge(ccFrom, ccTo CommitCover, gitDir string) (profile []*cover.P
 
 	commitTo, err := object.GetCommit(r.Storer, plumbing.NewHash(ccTo.CommitId))
 	if err != nil {
+		util.Logger.Println(err)
 		return
 	}
 	treeTo, err := commitTo.Tree()
