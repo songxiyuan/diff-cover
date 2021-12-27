@@ -78,6 +78,25 @@ func TestDiffCoverMerge(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "for test file not found error",
+			args: args{
+				cc1: CommitCover{
+					Repository:    "git@git.xiaojukeji.com:guarana/dive-app-g.git",
+					Branch:        "feature_oe_fix_gmv",
+					CommitId:      "51820ea18a1f1b7adf89d5670a7ba8065034c5cf",
+					CoverFilePath: "./test/dive-app-g/merged_51820ea18a1f1b7adf89d5670a7ba8065034c5cf.out",
+				},
+				cc2: CommitCover{
+					Repository:    "git@git.xiaojukeji.com:guarana/dive-app-g.git",
+					Branch:        "feature_oe_fix_gmv",
+					CommitId:      "f82f8abc4f05c2dd49c6035f977da353d82871d5",
+					CoverFilePath: "./test/dive-app-g/f82f8abc4f05c2dd49c6035f977da353d82871d5.out",
+				},
+				tempDir: "tmp/",
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

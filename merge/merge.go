@@ -200,7 +200,8 @@ func DiffProfileMerge(moduleNameFrom string, profilesFrom, profilesTo []*cover.P
 		file2Str, err := getFileString(treeTo, fileName)
 		if err != nil {
 			util.Logger.Println(err)
-			return err
+			continue //if file not exits in new version code, continue
+			//return err
 		}
 
 		line2line := GetLineMap(file1Str, file2Str)
